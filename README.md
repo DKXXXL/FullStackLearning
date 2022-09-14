@@ -26,14 +26,21 @@ To get practical, we suggest the official React tutorials
 * [Hooks as functional component](https://reactjs.org/docs/hooks-intro.html)
 
 
-The first one is very good when you go down *Option 2: Local Development Environment* -- because it teaches you (1.) how to use Create React App to setup a react project (2.) Where is the entry point of the whole web-application -- usually `index.js`. 
+The first one is very good when you go down *Option 2: Local Development Environment* -- because it teaches you (1.) how to use Create React App to setup a react project (2.) Where is the entry point of the whole web-application -- usually `index.js`. (3.) it helps you to be familiar with the project structure.
 
-The third tutorial is even more useful as a counterpart of class-based components introduced in the first two tutorials. It is more function as the hooks gives a vibe of *monadic programming*.
+The third tutorial is even more useful as a counterpart of class-based React components introduced in the first two tutorials. It is more function as the hooks gives a vibe of *monadic programming*.
 
 However, we don't suggest directly get hand dirty at this point because everything here is using Javascript. We will use Typescript throughout [also via Create React App](https://create-react-app.dev/docs/adding-typescript/).
 
+```bash
+npx create-react-app my-app --template typescript
+```
+
 At this point, one exercise you can do is to rewrite the tictactoe example using Hooks and Typescript.
 
-However, our first example is a dynamic view of the search of the solution for N-queen problem.
+However, our first example is a dynamic view of the searching process for the solution for N-queen problem.
 
 # N-queen
+The main pieces here are using typescript, generator (in Javascript) and React
+
+# an REPL 
