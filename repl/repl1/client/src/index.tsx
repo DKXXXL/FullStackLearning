@@ -39,7 +39,7 @@ function ReplInput() : JSX.Element {
               type="text" 
               value={input}
               // onChange will detect the change of the textbox, 
-              //    and make sure
+              //    and make sure `input` is the single source of truth of current `input`
               onChange={(evt) => setInput(evt.target.value)}
               onKeyUp={(evt) => {if (evt.key === "Enter") {input_new_line()}} }
               />
