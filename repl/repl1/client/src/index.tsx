@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState} from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
@@ -7,9 +7,41 @@ import reportWebVitals from './reportWebVitals';
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
+
+function evalJS (s : string) : string {
+  try {
+    let k = eval(s);
+    return k.toString()
+  } catch(err) {
+    
+    return (err as Error).message;
+  }
+}
+
+function ReplInput() : JSX.Element {
+  let [input, setInput] = useState("");
+  let [output, setOutput] = useState<Array<String>>([]);
+  let addOutput = (s : string) => setOutput((prev) => [s, ...prev]);
+  let outputs = <ul>{output.map((s) => <div>{s}</div>)}</ul> ;
+  return (
+    <div>
+      <div>
+        <input id="evalBox"
+              type="text" 
+              value={input}
+              onChange={(evt) => setInput(evt.target.value)}/>
+        <button onClick={() => {addOutput("> " + input); addOutput(evalJS(input))}}>Eval</button>
+      </div>
+    
+      {outputs}
+    
+  </div>
+  )
+}
+
 root.render(
   <React.StrictMode>
-    <App />
+    <ReplInput />
   </React.StrictMode>
 );
 

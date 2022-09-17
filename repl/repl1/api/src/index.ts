@@ -1,5 +1,6 @@
 import express, { Express, Request, Response } from 'express';
 import dotenv from 'dotenv';
+// dotenv is about getting environment information from ".env"
 
 dotenv.config();
 
