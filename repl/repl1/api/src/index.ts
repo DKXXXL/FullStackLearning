@@ -1,6 +1,7 @@
 import express, { Express, Request, Response } from 'express';
 import dotenv from 'dotenv';
 import bodyparser from 'body-parser';
+import { Server } from 'socket.io';
 
 // dotenv is about getting environment information from ".env"
 
@@ -31,3 +32,6 @@ app.get('/', (req: Request, res: Response) => {
 app.listen(port, () => {
   console.log(`⚡️[server]: Server is running at https://localhost:${port}`);
 });
+
+// we create a socket here
+
