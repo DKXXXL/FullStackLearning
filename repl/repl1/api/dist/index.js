@@ -6,6 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const body_parser_1 = __importDefault(require("body-parser"));
+const socket_io_1 = require("socket.io");
+const http_1 = __importDefault(require("http"));
 // dotenv is about getting environment information from ".env"
 dotenv_1.default.config();
 const cors = require("cors");
@@ -26,3 +28,19 @@ app.listen(port, () => {
     console.log(`⚡️[server]: Server is running at https://localhost:${port}`);
 });
 // we create a socket here
+// const server_app = express();
+const socket_port = 9000;
+// server_app.use(cors());
+const socket_server = http_1.default.createServer();
+const io = new socket_io_1.Server(socket_server, {
+    cors: {
+        // we need to specify the CORS here
+        origin: "http://192.168.0.127:3000"
+    }
+});
+io.on('connection', (socket) => {
+    console.log('a user connected');
+});
+socket_server.listen(socket_port, () => {
+    console.log(`socket port listening on *:${socket_port}`);
+});

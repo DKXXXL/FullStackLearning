@@ -7,7 +7,7 @@ import reportWebVitals from './reportWebVitals';
 import { useQuery, useMutation, QueryClientProvider, QueryClient } from 'react-query';
 import { send } from 'process';
 // import dotenv from 'dotenv';
-import io from 'socket.io-client';
+import {io} from 'socket.io-client';
 
 
 
@@ -36,8 +36,10 @@ const SERVERPORT = 8000;
 const SERVER : string = `http://192.168.0.127:${SERVERPORT}`
 const SERVER_JS = SERVER + "/JS"
 
+const SOCKET_SERVER : string = `http://192.168.0.127:9000`
 
-// const test = io();
+
+const test = io(SOCKET_SERVER);
 
 // a functional component has three subcomponents
 // a textinput box, a eval button and an output screen
