@@ -44,8 +44,8 @@ function ReplInput() : JSX.Element {
 
   
   let evaljs = async (s : string) => {
-    return axios.post<string>(SERVER_JS+'/eval', s).then(
-      ({data}) => {addOutput(data)}
+    return axios.post(SERVER_JS+'/eval', {exp : s}).then(
+      (data) => {addOutput(data.data.result)}
     )
   };
   // set up mutation here!
