@@ -8,6 +8,13 @@ Though we still do this.
 https://blog.logrocket.com/how-to-set-up-node-typescript-express/
 This provides a way of constructing typescript with express
 
+Finally we incorporate `src` directory by changing `tsconfig.json` with
+```
+  "include": [
+    "src"
+  ]
+```
+
 How the basic CRUD (create, read, update, delete) app on a database is constructed
 https://www.geeksforgeeks.org/how-to-build-a-basic-crud-app-with-node-js-and-reactjs/
 

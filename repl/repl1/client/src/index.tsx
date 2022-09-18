@@ -1,24 +1,38 @@
+import axios from 'axios';
 import React, {useState} from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
-import App from './App';
+// import App from './App';
 import reportWebVitals from './reportWebVitals';
+import { useQuery, useMutation, QueryClientProvider, QueryClient } from 'react-query';
+import { send } from 'process';
+// import dotenv from 'dotenv';
+
+
+// dotenv.config();
+const queryClient = new QueryClient();
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
 
+const AXIOSSUCCESS = 200; 
+
 // Use this react server to evaluate at the local
 // bad! e.g. not able to remember the lexical info
-function evalJS (s : string) : string {
-  try {
-    let k = eval(s);
-    return k.toString()
-  } catch(err) {
-    return (err as Error).message;
-  }
-}
-
+// and vulnerable
+// function evalJS (s : string) : string {
+//   try {
+//     let k = eval(s);
+//     return k.toString()
+//   } catch(err) {
+//     return (err as Error).message;
+//   }
+// }
+// const SERVERPORT = process.env.SERVERPORT;
+const SERVERPORT = 8000;
+const SERVER : string = `http://192.168.0.127:${SERVERPORT}`
+const SERVER_JS = SERVER + "/JS"
 
 // a functional component has three subcomponents
 // a textinput box, a eval button and an output screen
@@ -27,8 +41,22 @@ function ReplInput() : JSX.Element {
   // output will be a list of string as result
   let [output, setOutput] = useState<Array<string>>([]);
   let addOutput = (s : string) => setOutput((prev) => [s, ...prev]);
+
+  
+  let evaljs = async (s : string) => {
+    return axios.post<string>(SERVER_JS+'/eval', s).then(
+      ({data}) => {addOutput(data)}
+    )
+  };
+  // set up mutation here!
+  let sendreq = useMutation(evaljs);
   let clearInput = () => setInput("");
-  let input_new_line = () => {addOutput("> " + input); addOutput(evalJS(input));clearInput()};
+  let input_new_line = async () => {
+    addOutput("> " + input);  
+    sendreq.mutate(input);
+    // return res
+    clearInput()
+  };
   // this key is important for the React framework for some reason -- we just make sure every 
   // one in the list has a unique `key`
   let outputScreen = <ul>{output.map((s, index) => <div key={"el" + index.toString()}>{s}</div>)}</ul> ;
@@ -45,16 +73,17 @@ function ReplInput() : JSX.Element {
               />
         <button onClick={input_new_line}>Eval</button>
       </div>
-    
       {outputScreen}
-    
   </div>
   )
 }
 
 root.render(
+
   <React.StrictMode>
+    <QueryClientProvider client={queryClient}>
     <ReplInput />
+    </QueryClientProvider>
   </React.StrictMode>
 );
 
