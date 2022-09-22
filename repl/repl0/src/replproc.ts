@@ -31,7 +31,7 @@ let provide_id = ((i : number) => {
 // Initialize a generic repl
 export function initREPL (starter : REPL_Starter) : [REPL_Ident, (_ : string) => void] {
   let subprocess = spawn(starter.replname, starter.arguments);
-  subprocess.stdout.on('data', (s) => {starter.stdout_data_callback(s.toString())});
+  subprocess.stdout.on('data', starter.stdout_data_callback);
   let newid = provide_id();
   let inputrepl = (s : string) => subprocess.stdin.write(s + '\n');
   children_pool[newid] = [subprocess, inputrepl];
