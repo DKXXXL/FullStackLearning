@@ -2,14 +2,39 @@ import axios from 'axios';
 import React, {useEffect, useState} from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
+
 // import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { useQuery, useMutation, QueryClientProvider, QueryClient } from 'react-query';
 import { send } from 'process';
 // import dotenv from 'dotenv';
 import {io} from 'socket.io-client';
+import { JsxElement } from 'typescript';
+// import shl from 'highlight';
+// import 'highlight';
+import Prism from "prismjs";
 
+// const shl = require("prismjs");
 
+type HighlightingInput = {text : string, language:string}
+// function Highlighting(prop : HighlightingInput) : JSX.Element {
+//   let language = prop.language;
+//   let text = prop.text;
+//   if (language === undefined) {
+//     language = null;
+//   }
+//   return React.createElement(
+//     'pre', language,
+//     [React.createElement('code', null, [text])]
+//   )
+// }
+
+function Highlighting(prop : HighlightingInput) : JSX.Element {
+  let language = prop.language;
+  let text = prop.text;
+  let formatted = Prism.highlight(text, Prism.languages.javascript, 'javascript');
+  return <div dangerouslySetInnerHTML={{__html: formatted}}></div>
+}
 
 // dotenv.config();
 const queryClient = new QueryClient();
@@ -105,7 +130,14 @@ function ReplInput() : JSX.Element {
   };
   // this key is important for the React framework for some reason -- we just make sure every 
   // one in the list has a unique `key`
-  let outputScreen = <ul>{output.map((s, index) => <div key={"el" + index.toString()}>{s}</div>)}</ul> ;
+  let outputScreen = <ul>{output.map((s, index) => 
+    <div key={"el" + index.toString()} 
+    // dangerouslySetInnerHTML={{__html : (shl.highlight(s))}}
+    >  
+    <Highlighting text={s} language="javascript"/>
+    {/* {s} */}
+    </div>)}
+  </ul> ;
   return (
     <div>
       {outputScreen}
