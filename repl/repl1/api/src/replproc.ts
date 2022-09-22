@@ -7,14 +7,14 @@
 // 5. kill all the process when exiting
 import { ChildProcess, ChildProcessWithoutNullStreams, spawn } from "child_process";
 
-interface REPL_Starter {
+export interface REPL_Starter {
   replname : string;
   arguments : string[];
   initscript : string | null;
   stdout_data_callback : (_ : any) => void;
 }
 
-interface REPL_Ident {
+export interface REPL_Ident {
   id : number
 }
 // all the subprocesses, waiting for cleaning up
@@ -29,7 +29,7 @@ let provide_id = ((i : number) => {
 })(0);
 
 // Initialize a generic repl
-function initREPL (starter : REPL_Starter) : [REPL_Ident, (_ : string) => void] {
+export function initREPL (starter : REPL_Starter) : [REPL_Ident, (_ : string) => void] {
   let subprocess = spawn(starter.replname, starter.arguments);
   subprocess.stdout.on('data', starter.stdout_data_callback);
   let newid = provide_id();

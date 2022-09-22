@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import bodyparser from 'body-parser';
 import { Server } from 'socket.io';
 import http from 'http';
+import { JS_initREPL } from './jsproc';
 
 // dotenv is about getting environment information from ".env"
 
@@ -34,10 +35,23 @@ app.listen(port, () => {
   console.log(`⚡️[server]: Server is running at https://localhost:${port}`);
 });
 
+
+// we use socket -- this is a more natural way to do
+//    because the message is bidirectional -- especially when
+//    multi-threaded stuff is running, like in shell things are always bidirectional
+//  it is possible to make things easier by using HTML post but pipeline stuff seems better implemented by 
+//    socket
+
+// The following is an example creating a socket io server
+//    note that we need to specify CORS
+
+
 // we create a socket here
 // const server_app = express();
 const socket_port = 9000;
 // server_app.use(cors());
+// https://socket.io/docs/v3/handling-cors/
+//   check out here to handle cors
 const socket_server = http.createServer();
 const io = new Server(socket_server, {
   cors:{
@@ -48,7 +62,11 @@ const io = new Server(socket_server, {
 
 io.on('connection', (socket) => {
   console.log('a user connected');
+  // we need to create a new process from jsproc
+  // return the proc handler
 });
+
+
 
 socket_server.listen(socket_port, () => {
   console.log(`socket port listening on *:${socket_port}`);
