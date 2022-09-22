@@ -1,7 +1,10 @@
 import { JS_initREPL, JS_killREPL } from './jsproc';
 import { spawn } from 'child_process';
+import repl from 'repl';
 
 console.log("what")
+
+repl.start
 
 // var spawn = require('child_process').spawn,
 let child = spawn('node', ['-i']);

@@ -48,14 +48,26 @@ function ReplInput() : JSX.Element {
   let [input, setInput] = useState<string>("");
   // output will be a list of string as result
   let [output, setOutput] = useState<Array<string>>([]);
-  let addOutput = (s : string) => setOutput((prev) => [s, ...prev]);
+  let addOutput = (s : string) => setOutput((prev) => [...prev, s]);
+  let addToLastLine = (s : string) => setOutput(
+    (prev) => {
+      let newcontents = [...prev];
+      let len = newcontents.length;
+      newcontents[len-1] = newcontents[len-1] + s;
+      return newcontents 
+    });
 
   // register the connection status with socket
   useEffect(() => {
     socket.on('connect', () => setIsConnected(true));
     socket.on('disconnect', () => setIsConnected(false));  
     socket.on('stdout', (s : string) => {
-      addOutput(s);
+      if (s.endsWith("\n")) {
+        addOutput(s);
+      }
+      else {
+        addOutput(s + "\n")
+      }
     });
     return () => {
       // if this .off is removed, then it will repeat on stdout
@@ -85,6 +97,7 @@ function ReplInput() : JSX.Element {
   let clearInput = () => setInput("");
   let input_new_line = () => {
     // addOutput("> " + input);  
+    addToLastLine(input);
     evaljs(input);
     // return res
     clearInput()
