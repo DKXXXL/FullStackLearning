@@ -97,6 +97,7 @@ function ReplInput() : JSX.Element {
   let clearInput = () => setInput("");
   let input_new_line = () => {
     // addOutput("> " + input);  
+    if (!isConnected) {return}
     addToLastLine(input);
     evaljs(input);
     // return res
@@ -107,8 +108,9 @@ function ReplInput() : JSX.Element {
   let outputScreen = <ul>{output.map((s, index) => <div key={"el" + index.toString()}>{s}</div>)}</ul> ;
   return (
     <div>
-      <div>
-        <input id="evalBox"
+      {outputScreen}
+      <div id="evalBox">
+        <input id="evalInput"
               type="text" 
               value={input}
               // onChange will detect the change of the textbox, 
@@ -119,7 +121,6 @@ function ReplInput() : JSX.Element {
         <button onClick={input_new_line}
                 disabled={!isConnected}>Eval</button>
       </div>
-      {outputScreen}
   </div>
   )
 }
