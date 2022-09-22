@@ -39,7 +39,7 @@ const SERVER_JS = SERVER + "/JS"
 const SOCKET_SERVER : string = `http://192.168.0.127:9000`
 
 
-const test = io(SOCKET_SERVER);
+const socket = io(SOCKET_SERVER);
 
 // a functional component has three subcomponents
 // a textinput box, a eval button and an output screen

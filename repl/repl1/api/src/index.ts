@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import bodyparser from 'body-parser';
 import { Server } from 'socket.io';
 import http from 'http';
-import { JS_initREPL } from './jsproc';
+import { JS_initREPL, JS_killREPL } from './jsproc';
 
 // dotenv is about getting environment information from ".env"
 
@@ -60,10 +60,27 @@ const io = new Server(socket_server, {
   }
 }); 
 
+// for each user there is a corresponding unique socket.id
+// we map each socket.id to 
+
+// var user_REPL_map : {[ _ : string] : number} = {};
+
+// function get_REPL_handler (id : string) : 
+
 io.on('connection', (socket) => {
-  console.log('a user connected');
+  console.log(`user ${socket.id} connected`);
   // we need to create a new process from jsproc
   // return the proc handler
+  let stdout = (s : string) => {socket.emit("stdout", s);};
+  let [replid, replinput] = JS_initREPL(stdout);
+
+  socket.on('stdin', (s) => {replinput(s);});
+  // register deallocation: see https://socket.io/get-started/chat
+  socket.on('disconnect', () =>{
+    console.log(`user ${socket.id} disconnected`);
+    JS_killREPL(replid);
+  }
+  );
 });
 
 

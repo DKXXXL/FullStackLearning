@@ -11,7 +11,7 @@ export interface REPL_Starter {
   replname : string;
   arguments : string[];
   initscript : string | null;
-  stdout_data_callback : (_ : any) => void;
+  stdout_data_callback : (_ : string) => void;
 }
 
 export interface REPL_Ident {
@@ -38,4 +38,9 @@ export function initREPL (starter : REPL_Starter) : [REPL_Ident, (_ : string) =>
   return ([{id : newid}, inputrepl]);
 } 
 
+
+export function killREPL (repl : REPL_Ident) : void {
+  let [subprocess, _] = children_pool[repl.id];
+  subprocess.kill();
+}
 // function inputREPL ()
