@@ -5,7 +5,7 @@ import {initREPL, REPL_Starter, REPL_Ident, killREPL } from './replproc'
 function JS_REPL_STARTER (stdout_data_callback : ((_ : string) => void)) : REPL_Starter {
   return {
     replname : "node",
-    arguments : [],
+    arguments : ['-i'],
     initscript : null,
     stdout_data_callback : stdout_data_callback,
   };

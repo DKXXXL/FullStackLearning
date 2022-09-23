@@ -13,6 +13,10 @@ import { JsxElement } from 'typescript';
 // import shl from 'highlight';
 // import 'highlight';
 import Prism from "prismjs";
+// import AceEditor from "react-ace";
+// import "ace-builds/src-noconflict/mode-javascript";
+// import "ace-builds/src-noconflict/theme-github";
+// import "ace-builds/src-noconflict/ext-language_tools";
 
 // const shl = require("prismjs");
 
