@@ -1,0 +1,35 @@
+
+
+#historydisplay {
+  background-color: black;
+  color: white;
+  font-family: monospace;
+  font-size: large;
+  /* display:inline; */
+}
+
+.terminal-div {
+  background-color: black;
+  color: white;
+  font-family: monospace;
+  font-size: large;
+}
+#maininput {
+  background-color: black;
+  color: white;
+  font-family: monospace;
+  font-size: large;
+  width:99%;
+}
+
+
+#prefix{
+  background-color: black;
+  color:burlywood;
+  width: fit-content;
+}
+
+#block_container
+{
+    display: flex;
+}
