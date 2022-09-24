@@ -14,7 +14,7 @@ const root = ReactDOM.createRoot(
 
 root.render(
   <React.StrictMode>
-    <Terminal input_prefix=' > '/>
+    <Terminal toServer={async (s) => { await new Promise ((r) => setTimeout(r, 1000)) ;return "Nothing";}} fromServer={(_) => {}} />
   </React.StrictMode>
 );
 

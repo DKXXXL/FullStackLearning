@@ -33,3 +33,7 @@
 {
     display: flex;
 }
+
+.nospace {
+  display: inline;
+}
