@@ -23,6 +23,11 @@ export default function Terminal(prop : TerminalProperty) {
     displayHistory.map((a, _) => {return (<div className='terminal-div'> {a} </div>)});
     // displayHistory.reduce((a, b, _) => a + '\n' + b, "");
   let addHistory = (s : string) => setDisplayHistory((prev) => [...prev, s]);
+  let addLastOutput = (s : string) => setDisplayHistory((prev) => {
+    let n = [...prev];
+    n[n.length - 1] = n[n.length - 1] + s;
+    return n
+  });
   
   let input_new_line = () => {
     addHistory(input_prefix + inputContent);
@@ -35,7 +40,7 @@ export default function Terminal(prop : TerminalProperty) {
 
 
   useEffect(() => {
-    prop.fromServer(addHistory);
+    prop.fromServer(addLastOutput);
   }
   ,[]);
 
@@ -75,5 +80,6 @@ export default function Terminal(prop : TerminalProperty) {
 
   // let inputdisplay = <textarea onInput={(evt) => {evt}}></textarea>
   let with_or_out_input = [...history_content, (idlestate? inputdisplay : loading)];
-  return <ul className='nospace'> {with_or_out_input}  </ul>
+  // return <ul className='nospace'> {with_or_out_input}  </ul>
+  return <div> {with_or_out_input} </div>
 }

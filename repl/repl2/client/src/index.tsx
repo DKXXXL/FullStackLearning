@@ -4,17 +4,25 @@ import './index.css';
 // import App from './App';
 import reportWebVitals from './reportWebVitals';
 import Terminal from "./terminal";
+import repl from 'repl';
+// import "stream-browserify"
+import stream from 'stream';
+
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
+// const stream = require("stream");
+// const k = new stream.Readable();
+// For some reason I cannot make the following run, repl and stream are not there
+const input = new stream.PassThrough();
+const output = new stream.PassThrough();
 
-
-
+const server = repl.start({prompt : "", input : input, output : output})
 
 root.render(
   <React.StrictMode>
-    <Terminal toServer={async (s) => { await new Promise ((r) => setTimeout(r, 1000)) ;return "Nothing";}} fromServer={(_) => {}} />
+    <Terminal toServer={async (s) => { input.write(s); return ""}} fromServer={(f) => {output.on("data", (s) => {f(s)})}} />
   </React.StrictMode>
 );
 
