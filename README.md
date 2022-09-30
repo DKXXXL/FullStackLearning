@@ -43,13 +43,21 @@ To get practical, we suggest the official React tutorials
 * [Hooks as functional component](https://reactjs.org/docs/hooks-intro.html)
 
 
-The first one is very good when you go down *Option 2: Local Development Environment* -- because it teaches you (1.) how to use Create React App to setup a react project (2.) Where is the entry point of the whole web-application -- usually `index.js`. (3.) it helps you to be familiar with the project structure.
+The first one is very good when you go down *Option 2: Local Development Environment* -- because it teaches you (1.) how to use 'Create React App' to setup a react project (2.) Where is the entry point of the whole web-application -- usually `index.js`. (3.) it helps you to be familiar with the project structure.
+
+***
 
 However, the downside of using *Create React App* is, it is not clear on how React App is connected with NodeJs. We know NodeJs is only providing a server, and we know intuitivly it is passing back `index.html` in the `public` folder and `index.js/index.tsx` will modify the `root` div in the `html` accordingly. But
 1. How is `index.html` passing back? (Maybe the correct way to ask how to implement these in vanilla )
 2. Where is the program responsible for running the code in `index.tsx/index.js`? I don't find `index.tsx/index.js` included in `index.html`. In other word, [what happened in `Create React App` under the hood](https://www.freecodecamp.org/news/create-react-app-npm-scripts-explained/)?
 
+However, even if we skip these technical details and don't understand what is happening with `Create React App`, using the intuition above, we still can continue the development.
+
+***
+
 The third tutorial is even more useful as a counterpart of class-based React components introduced in the first two tutorials. It is more functional as the hooks gives a vibe of *monadic programming*. We will mainly use this style of programming.
+
+
 
 However, we don't suggest directly get hand dirty at this point because everything here is using Javascript. We will use Typescript throughout [also via Create React App](https://create-react-app.dev/docs/adding-typescript/).
 
@@ -62,6 +70,6 @@ At this point, one exercise you can do is to rewrite the tictactoe example using
 However, our first example is a dynamic view of the searching process for the solution for N-Queen problem.
 
 # N-queen
-The main pieces here are using typescript, generator (in Javascript) and React
 
-# an REPL 
+
+# REPL1 
