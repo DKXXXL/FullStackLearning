@@ -1,3 +1,7 @@
+
+Run `npm start` here and you will get a running server for front-end.
+
+***
 # Dynamic NQueen
 We start with something very simple: a dynamic animation of NQueen searching, by reusing most of the CSS files provided in the *tictactoe* example. 
 

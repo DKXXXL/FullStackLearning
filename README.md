@@ -69,7 +69,7 @@ At this point, one exercise you can do is to rewrite the tictactoe example using
 
 However, our first example is a dynamic view of the searching process for the solution for N-Queen problem.
 
-# N-queen
+# [Animated N-Queen Searching](nqueen/nqueen2/README.md)
 
 
-# REPL1 
+# [REPL, Version 1](repl/repl1/README.md) 
