@@ -1,0 +1,6 @@
+(executable
+ (name chat)
+ (libraries core lwt lwt.unix lwt_ppx)
+ (preprocess (pps lwt_ppx))
+ (flags (:standard))
+ )
