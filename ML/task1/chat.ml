@@ -51,16 +51,13 @@ let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t =
   Lwt.return ()
 
 
-let start_server =  
-    let server_addr = (Unix.ADDR_INET(Unix.inet_addr_of_string _LOCAL_HOST, port)) in
-    Lwt_unix.set_close_on_exec socket;
-    Lwt_unix.setsockopt socket Unix.SO_REUSEADDR true;
-    let%lwt _ =  Lwt_unix.bind socket server_addr in 
-    let _ =  Lwt_unix.listen socket 1 in
-    (* Make Things Easier -- We only allow one client *) 
-    let%lwt (chattingsock, _) =  Lwt_unix.accept socket in 
+let rec start_server () =  
+    let%lwt _ = Lwt_io.establish_server_with_client_address server_addr (fun _ p -> chatting p) in 
+    start_server ()
+    (* Wait for the next connection*)
 
-
+let start_client =
+    Lwt_io.with_connection server_addr chatting
 
 
 let rec output_hello () = 
