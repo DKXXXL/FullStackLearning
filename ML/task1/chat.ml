@@ -57,10 +57,10 @@ module MessageProtocal = struct
      one for real messages 
      we will have a worker doing this
      *)
-  let classify_input (inchn : input_channel) : (input_channel * input_channel * unit Lwt.t) = 
+  let classify_input (inchn : input_channel) : (input_channel * input_channel * input_channel * unit Lwt.t) = 
     let msg_inchn, msg_outchn = pipe () in 
     let receipt_inchn, receipt_outchn = pipe () in 
-    let _, disconnect_outchn = pipe() in 
+    let disconnect_inchn, disconnect_outchn = pipe() in 
     let rec classifier () = 
       with_channel [Package inchn] 
       begin 
@@ -77,15 +77,17 @@ module MessageProtocal = struct
             classifier ()
       end  
       (fun _ -> 
+        info_print "Closing Classifier";
         let%lwt _ = Lwt_io.close msg_outchn in 
         let%lwt _ = Lwt_io.close receipt_outchn in 
         Lwt.return () 
         ) () (* Close the splitted Channel when inchn is closed *)
     in 
-    (msg_inchn, receipt_inchn, classifier())
+    (msg_inchn, receipt_inchn, disconnect_inchn, classifier())
 
   let send_receipt (outchn : output_channel) : unit Lwt.t = Lwt_io.write_line outchn (receipt_header)
   let send_message (outchn : output_channel) s : unit Lwt.t = Lwt_io.write_line outchn (msg_header^s)
+  let send_disconnect outchn = Lwt_io.write_line outchn on_close_header
     
 end
 
@@ -98,7 +100,8 @@ end
 let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t = 
   (* first split the channel into msg and recepit *)
   info_print "New Link Connected!";
-  let msg_inchn, receipt_inchn, split_worker = MessageProtocal.classify_input inchn in 
+  
+  let msg_inchn, receipt_inchn, disconnect_inchn, split_worker = MessageProtocal.classify_input inchn in 
   
   let rec reader_to_screen () = 
   with_channel_unit [Package msg_inchn; Package outchn]
@@ -124,13 +127,36 @@ let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t =
   end ()
   in 
 
-  let start_reading = reader_to_screen () in 
-  let start_writing = writer_to_socket () in 
-  let%lwt _ = start_reading in 
-  let%lwt _ = start_writing in 
-  let%lwt _ = split_worker in 
-  info_print "Link Disconnected!";
-  Lwt.return ()
+
+
+  begin 
+      let start_reading = reader_to_screen () in 
+      let start_writing = writer_to_socket () in 
+      let exit_chatting_threads () = 
+        let%lwt _ = Lwt_io.close inchn in 
+        let%lwt _ = Lwt_io.close outchn in 
+        Lwt.cancel start_reading;
+        Lwt.cancel start_writing; 
+        Lwt.return () in 
+      (* Ctrl + C can exit our loop *)
+      let close_by_ourselves, close_ourselves = Lwt.wait () in  
+      let handler = 
+        Lwt_unix.on_signal_full Sys.sigint (fun handler _ -> 
+              let _ = MessageProtocal.send_disconnect outchn in 
+              Lwt_unix.disable_signal_handler handler;
+              Lwt.wakeup_later close_ourselves ()
+            ) in 
+      let close_by_receiver = 
+        let%lwt _ = Lwt_io.read_line disconnect_inchn in 
+        info_print "Receiver Disconnected. Closing Right now...";
+        exit_chatting_threads () 
+      in 
+      let%lwt _ = Lwt.pick [close_by_receiver; close_by_ourselves] in 
+      Lwt_unix.disable_signal_handler handler;
+      info_print "Link Disconnected!";
+      Lwt.return ()
+    
+  end
 
 
 
@@ -152,6 +178,7 @@ let server_addr =
   keep_waiting () *)
 
 let start_server () = 
+  info_print "Starting Server ...";
   let open Lwt in
   let listening_socket = 
     let open Lwt_unix in
@@ -161,10 +188,11 @@ let start_server () =
     Lwt.return sock
   in 
   let rec serve () = 
+  info_print "Listening ...";
     let%lwt sock = listening_socket in 
     let%lwt msg_socket, _ = Lwt_unix.accept sock in 
-    let inch = Lwt_io.of_fd ~close:(fun _ -> info_print "Socket Closing"; return ()) ~mode:Lwt_io.Input msg_socket in 
-    let outch = Lwt_io.of_fd ~close:(fun _ -> info_print "Socket Closing"; return ()) ~mode:Lwt_io.Output msg_socket in 
+    let inch = Lwt_io.of_fd ~close:(fun _ -> info_print "Socket/Input Channel Closing"; return ()) ~mode:Lwt_io.Input msg_socket in 
+    let outch = Lwt_io.of_fd ~close:(fun _ -> info_print "Socket/Output Channel Closing"; return ()) ~mode:Lwt_io.Output msg_socket in 
     let%lwt _ = chatting (inch,outch) in 
     serve() in 
   serve()
