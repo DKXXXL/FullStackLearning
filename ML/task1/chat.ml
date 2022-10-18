@@ -5,6 +5,7 @@ exception NonImplement
 
 type arbitrary_channel = Package : ('a channel) ->  arbitrary_channel
 
+(* Guarding to make sure chns are all open *)
 let with_channel (chns : arbitrary_channel list) (f : unit -> 'b Lwt.t) (c : unit -> 'c Lwt.t) (default : 'b) : 'b Lwt.t = 
   let any_is_closed = List.fold_left (fun a (Package b) -> a || (Lwt_io.is_closed b)) false chns in 
   if any_is_closed then 
@@ -15,8 +16,6 @@ let with_channel_unit chn f ?(when_end=(fun _ -> Lwt.return ())) () = with_chann
 
 (* The following is to resolve the problem that 
    there are two types of data, one messeage, one receipt
-   Some simple solution is not working because the lack of peek in the function
-   we use a weirder way to do it, by split the channel to two
    *)
 module MessageProtocal = struct
 
@@ -37,11 +36,12 @@ module MessageProtocal = struct
   let remove_header (s : string) = 
     match data_classification s with 
     | Msg  
-    | Receipt -> raise NonImplement 
-  (* Make the header is lawful -- i.e. either receipt or msg 
+    | Receipt -> 
+      String.sub s 1 (String.length s - 1)
+  (* Make sure the header is lawful -- i.e. either receipt or msg 
       But We maynot need this function   
   *)
-  let validate_header (f : input_channel) : unit Lwt.t = raise NonImplement 
+  let validate_header (_ : input_channel) : unit Lwt.t = raise NonImplement 
 
   (* we classify the channel into two parts, 
      one for recepit receiver
@@ -67,7 +67,7 @@ module MessageProtocal = struct
         let%lwt _ = Lwt_io.close msg_outchn in 
         let%lwt _ = Lwt_io.close receipt_outchn in 
         Lwt.return () 
-        ) ()
+        ) () (* Close the splitted Channel when inchn is closed *)
     in 
     (msg_inchn, receipt_inchn, classifier())
 
@@ -79,15 +79,8 @@ end
 
 
 
-(* Configuration *)
-let server_addr = 
-  (* let socket = Lwt_unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in  *)
-  let _LOCAL_HOST = "127.0.0.1" in  
-  let port = 9998 in 
-  (Unix.ADDR_INET(Unix.inet_addr_of_string _LOCAL_HOST, port))
 
-
-
+(* Given input and output channel, do the chatting work *)
 (* Currently this is fixed with stdout and stdin as interactive interface *)
 let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t = 
   (* first split the worker *)
@@ -104,7 +97,7 @@ let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t =
   in
   
   let rec writer_to_socket () = 
-  with_channel_unit [Package receipt_inchn; Package outchn]
+  with_channel_unit [Package receipt_inchn; Package outchn; Package stdin]
   begin fun _ ->
     let%lwt data = Lwt_io.(read_line stdin) in
     let%lwt () = Lwt_io.write outchn data in 
@@ -119,6 +112,15 @@ let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t =
   let%lwt _ = start_writing in 
   let%lwt _ = split_worker in 
   Lwt.return ()
+
+
+
+(* Configuration *)
+let server_addr = 
+  (* let socket = Lwt_unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in  *)
+  let _LOCAL_HOST = "127.0.0.1" in  
+  let port = 9998 in 
+  (Unix.ADDR_INET(Unix.inet_addr_of_string _LOCAL_HOST, port))
 
 
 let rec start_server () =  
