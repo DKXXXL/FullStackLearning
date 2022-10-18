@@ -83,7 +83,7 @@ end
 (* Given input and output channel, do the chatting work *)
 (* Currently this is fixed with stdout and stdin as interactive interface *)
 let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t = 
-  (* first split the worker *)
+  (* first split the channel into msg and recepit *)
   let msg_inchn, receipt_inchn, split_worker = MessageProtocal.classify_input inchn in 
   
   let rec reader_to_screen () = 
@@ -99,9 +99,11 @@ let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t =
   let rec writer_to_socket () = 
   with_channel_unit [Package receipt_inchn; Package outchn; Package stdin]
   begin fun _ ->
+    let before_sent = Sys.time() in 
     let%lwt data = Lwt_io.(read_line stdin) in
     let%lwt () = Lwt_io.write outchn data in 
     let%lwt _ = Lwt_io.read_line receipt_inchn in 
+    Printf.printf "Message (%s) Delivered, roundtrip time: %fs\n" data (Sys.time() -. before_sent);
     writer_to_socket () 
   end ()
   in 
@@ -128,30 +130,24 @@ let rec start_server () =
     start_server ()
     (* Wait for the next connection*)
 
-let start_client =
+let start_client () =
     Lwt_io.with_connection server_addr chatting
 
 
-let rec output_hello () = 
-  let%lwt () = Lwt_unix.sleep 2.0 in
-  let%lwt () = Lwt_io.printl "hello" in
-  output_hello ()
-
-let rec echo () = 
-  let%lwt data = Lwt_io.(read_line stdin) in
-  let%lwt () = Lwt_io.printl data in
-  echo ()  
-
-
 let () =
-  print_endline "Starts";
-  Lwt_main.run 
-  begin
-  (* let h1 = output_hello () in 
-  let h2 = echo () in 
-  let%lwt _ = h1 in 
-  let%lwt _ = h2 in  *)
-  let%lwt _ = Lwt.join [echo(); output_hello ()] in 
-  Lwt.return ()
-  end
+  if Array.length Sys.argv != 1
+     || (Array.get Sys.argv 0 != "Server" && Array.get Sys.argv 0 != "Client")
+    then 
+    begin
+      Printf.printf "Usage: One argument either Server or Client";
+      exit (-1)
+    end
+    else (); 
+  Lwt_main.run @@
+  if Array.get Sys.argv 0 == "Server" 
+    then 
+    start_server () 
+    else
+    start_client ()
+
   
