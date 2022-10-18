@@ -3,14 +3,20 @@ open Lwt_io
 
 exception NonImplement
 
+type arbitrary_channel = Package : ('a channel) ->  arbitrary_channel
+
+let with_channel (chns : arbitrary_channel list) (f : unit -> 'b Lwt.t) (c : unit -> 'c Lwt.t) (default : 'b) : 'b Lwt.t = 
+  let any_is_closed = List.fold_left (fun a (Package b) -> a || (Lwt_io.is_closed b)) false chns in 
+  if any_is_closed then 
+    (let%lwt _ = c () in Lwt.return ()) 
+  else f ()
+
+let with_channel_unit chn f ?(when_end=(fun _ -> Lwt.return ())) () = with_channel chn f when_end ()
+
 (* The following is to resolve the problem that 
    there are two types of data, one messeage, one receipt
-   Apparently we can add a header in the front of the string
-    to distinguish
-   But the direct style of programming cannot accept this ... because 
-    we don't have peek!
-   if we have peek, then we can just finish the get_info
-    stucked.
+   Some simple solution is not working because the lack of peek in the function
+   we use a weirder way to do it, by split the channel to two
    *)
 module MessageProtocal = struct
 
@@ -21,33 +27,56 @@ module MessageProtocal = struct
   let receipt_header = "0"
   let msg_header = "1"
   
+  type datakind = Msg | Receipt
+
+  let data_classification (s : string) =
+    if String.starts_with s ~prefix:receipt_header then Receipt else 
+    if String.starts_with s ~prefix:msg_header then Msg else 
+    raise NonImplement
+
+  let remove_header (s : string) = 
+    match data_classification s with 
+    | Msg  
+    | Receipt -> raise NonImplement 
   (* Make the header is lawful -- i.e. either receipt or msg 
       But We maynot need this function   
   *)
   let validate_header (f : input_channel) : unit Lwt.t = raise NonImplement 
 
-  (* The idea is to peak the head of the channel
-      using pred, the int is the length of the header to peak
-      if it is, then we really read the header, but note we have to use atomic read (read_line is)
-      if it is not, we use pause function to temparary to shift to other thread  
-      *)
-  let get_info_with_header (f : input_channel) (pred : (int* (string -> bool))) : string Lwt.t = 
-    (* but we don't have peek! *)
-    raise NonImplement
+  (* we classify the channel into two parts, 
+     one for recepit receiver
+     one for real messages 
+     we will have a worker doing this
+     *)
+  let classify_input (inchn : input_channel) : (input_channel * input_channel * unit Lwt.t) = 
+    let msg_inchn, msg_outchn = pipe () in 
+    let receipt_inchn, receipt_outchn = pipe () in 
+    let rec classifier () = 
+      with_channel [Package inchn] 
+      begin 
+        fun _ -> 
+          let%lwt newinfo = Lwt_io.read_line inchn in 
+          let%lwt _ = begin match data_classification newinfo with 
+                      | Msg ->  let pureinfo = remove_header newinfo in 
+                                Lwt_io.write_line msg_outchn pureinfo 
+                      | Receipt -> Lwt_io.write_line receipt_outchn newinfo (* there is no content in receipt *)
+                      end in 
+            classifier ()
+      end  
+      (fun _ -> 
+        let%lwt _ = Lwt_io.close msg_outchn in 
+        let%lwt _ = Lwt_io.close receipt_outchn in 
+        Lwt.return () 
+        ) ()
+    in 
+    (msg_inchn, receipt_inchn, classifier())
 
-  let send_message (s : string) (f : output_channel) : unit Lwt.t = 
-    Lwt_io.write_line f (msg_header^s)
-  let read_message (f : input_channel) : string Lwt.t = 
-    let pred = (String.length msg_header, fun s -> s == msg_header) in 
-    get_info_with_header f pred
-
-  let send_receipt (f : output_channel) : unit Lwt.t = 
-    Lwt_io.write_line f receipt_header 
-
-  let wait_receipt (f : input_channel) : unit Lwt.t = raise NonImplement
-
-
+  let send_receipt (outchn : output_channel) : unit Lwt.t = Lwt_io.write_line outchn receipt_header
+  let send_message s (outchn : output_channel) : unit Lwt.t = Lwt_io.write_line outchn (msg_header^s)
+    
 end
+
+
 
 
 (* Configuration *)
@@ -57,45 +86,38 @@ let server_addr =
   let port = 9998 in 
   (Unix.ADDR_INET(Unix.inet_addr_of_string _LOCAL_HOST, port))
 
-let start_chatting (sock : Lwt_unix.file_descr) = 
-  let rec reader_to_screen chn = 
-    let%lwt newmessage = Lwt_io.read_line chn in 
-    let%lwt () = Lwt_io.printl newmessage in
-    Lwt_io. 
-    reader_to_screen chn in
-  
-  
-  let rec writer_to_socket chn = 
-    let%lwt data = Lwt_io.(read_line stdin) in
-    let%lwt () = Lwt_io.write_line chn data in 
-    writer_to_socket chn in 
-  let inchn = Lwt_io.of_fd ~mode:Lwt_io.Input sock in 
-  let outchn = Lwt_io.of_fd ~mode:Lwt_io.Output sock in 
-
-  let start_reading = reader_to_screen inchn in 
-  let start_writing = writer_to_socket outchn in 
-  (* wait for either sides to complete *)
-  let%lwt _ = start_reading in 
-  let%lwt _ = start_writing in 
-  Lwt.return ()
 
 
-(* Currently this is fixed with stdout and stdin *)
+(* Currently this is fixed with stdout and stdin as interactive interface *)
 let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t = 
-  let rec reader_to_screen chn = 
-    let%lwt newmessage = Lwt_io.read_line chn in 
-    let%lwt () = Lwt_io.printl newmessage in 
-    reader_to_screen chn in
+  (* first split the worker *)
+  let msg_inchn, receipt_inchn, split_worker = MessageProtocal.classify_input inchn in 
   
-  let rec writer_to_socket chn = 
+  let rec reader_to_screen () = 
+  with_channel_unit [Package msg_inchn; Package outchn]
+  begin fun _ ->
+    let%lwt newmessage = Lwt_io.read_line msg_inchn in 
+    let%lwt _ = MessageProtocal.send_receipt outchn in 
+    let%lwt () = Lwt_io.printl newmessage in 
+    reader_to_screen () 
+  end ()
+  in
+  
+  let rec writer_to_socket () = 
+  with_channel_unit [Package receipt_inchn; Package outchn]
+  begin fun _ ->
     let%lwt data = Lwt_io.(read_line stdin) in
-    let%lwt () = Lwt_io.write chn data in 
-    writer_to_socket chn in 
+    let%lwt () = Lwt_io.write outchn data in 
+    let%lwt _ = Lwt_io.read_line receipt_inchn in 
+    writer_to_socket () 
+  end ()
+  in 
 
-  let start_reading = reader_to_screen inchn in 
-  let start_writing = writer_to_socket outchn in 
+  let start_reading = reader_to_screen () in 
+  let start_writing = writer_to_socket () in 
   let%lwt _ = start_reading in 
   let%lwt _ = start_writing in 
+  let%lwt _ = split_worker in 
   Lwt.return ()
 
 
