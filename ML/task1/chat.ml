@@ -1,5 +1,6 @@
 
 open Lwt_io 
+open Lwt 
 
 exception NonImplement
 
@@ -19,10 +20,36 @@ let with_channel (chns : arbitrary_channel list) (f : unit -> 'b Lwt.t) (c : uni
 
 let with_channel_unit chn f ?(when_end=(fun _ -> info_print "Channel Closed!"; Lwt.return ())) () = with_channel chn f when_end ()
 
+
+
+
+
 (* The following is to resolve the problem that 
    there are two types of data, one messeage, one receipt
    *)
-module MessageProtocal = struct
+module type MessageProtocolInterface = sig 
+
+  type about_message
+
+  type about_receipt 
+  (* Disconnect Channel is a channel for signalling disconnection *)
+  type about_disconnect
+
+  (* Classify the input channel into three channels
+      where we also has an async thread doing the separation *)
+  val classify_input : input_channel -> (about_message channel * about_receipt channel * about_disconnect channel * unit Lwt.t)
+
+  val send_receipt : output_channel -> unit Lwt.t
+  val send_message : output_channel -> string -> unit Lwt.t 
+  val send_disconnect : output_channel -> unit Lwt.t
+
+  val read_message : about_message channel ->  string Lwt.t 
+  val read_receipt : about_receipt channel -> unit Lwt.t 
+  val read_disconnect : about_disconnect channel -> unit Lwt.t
+end
+
+
+module MessageProtocolNaive : MessageProtocolInterface = struct
 
   (* Old untyped way -- we make sure every
       untyped messages, when sent, has a header indicating the "type" of the message
@@ -84,9 +111,21 @@ module MessageProtocal = struct
     in 
     (msg_inchn, receipt_inchn, disconnect_inchn, classifier())
 
+  type about_message = input 
+
+  type about_receipt = input 
+  (* Disconnect Channel is a channel for signalling disconnection *)
+  type about_disconnect = input
+
   let send_receipt (outchn : output_channel) : unit Lwt.t = Lwt_io.write_line outchn (receipt_header)
   let send_message (outchn : output_channel) s : unit Lwt.t = Lwt_io.write_line outchn (msg_header^s)
   let send_disconnect outchn = Lwt_io.write_line outchn on_close_header
+
+  let read_message (inchn : input_channel) : string Lwt.t = Lwt_io.read_line inchn 
+
+  let read_receipt (inchn : input_channel) : unit Lwt.t = Lwt_io.read_line inchn >>= (fun _ -> return_unit) 
+
+  let read_disconnect (inchn : input_channel)  : unit Lwt.t = Lwt_io.read_line inchn >>= (fun _ -> return_unit)
     
 end
 
@@ -99,14 +138,14 @@ end
 let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t = 
   (* first split the channel into msg and recepit *)
   info_print "New Link Connected!";
-  
-  let msg_inchn, receipt_inchn, disconnect_inchn, split_worker = MessageProtocal.classify_input inchn in 
+  let open MessageProtocolNaive in 
+  let msg_inchn, receipt_inchn, disconnect_inchn, split_worker = classify_input inchn in 
   
   let rec reader_to_screen () = 
   with_channel_unit [Package msg_inchn; Package outchn]
   begin fun _ ->
-    let%lwt newmessage = Lwt_io.read_line msg_inchn in 
-    let%lwt _ = MessageProtocal.send_receipt outchn in 
+    let%lwt newmessage = read_message msg_inchn in 
+    let%lwt _ = send_receipt outchn in 
     let%lwt () = Lwt_io.printl newmessage in 
     reader_to_screen () 
   end ()
@@ -118,8 +157,8 @@ let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t =
     let%lwt data = Lwt_io.(read_line stdin) in
     let before_sent = Sys.time() in 
     (* info_print "Writing New Things"; *)
-    let%lwt () = MessageProtocal.send_message outchn data in 
-    let%lwt _ = Lwt_io.read_line receipt_inchn in 
+    let%lwt () = send_message outchn data in 
+    let%lwt _ = read_receipt receipt_inchn in 
     let roundtrip = Printf.sprintf "Message (%s) Delivered, roundtrip time: %fs" data (Sys.time() -. before_sent) in 
     info_print roundtrip;
     writer_to_socket () 
@@ -144,11 +183,11 @@ let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t =
         Lwt.bind close_by_ourselves exit_chatting_threads in  
       let handler = 
         Lwt_unix.on_signal_full Sys.sigint (fun _ _ -> 
-              let _ = MessageProtocal.send_disconnect outchn in 
+              let _ = send_disconnect outchn in 
               Lwt.wakeup_later close_ourselves ()
             ) in 
       let close_by_receiver = 
-        let%lwt _ = Lwt_io.read_line disconnect_inchn in 
+        let%lwt _ = read_disconnect disconnect_inchn in 
         info_print "Receiver Disconnected. Closing Right now...";
         exit_chatting_threads () 
       in 
