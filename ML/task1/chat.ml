@@ -30,7 +30,6 @@ module MessageProtocal = struct
   *)
   let receipt_header = "0"
   let msg_header = "1"
-
   let on_close_header = "2"
   
   type datakind = Msg | Receipt | Disconnect
@@ -133,17 +132,17 @@ let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t =
       let start_reading = reader_to_screen () in 
       let start_writing = writer_to_socket () in 
       let exit_chatting_threads () = 
-        let%lwt _ = Lwt_io.close inchn in 
-        let%lwt _ = Lwt_io.close outchn in 
         Lwt.cancel start_reading;
         Lwt.cancel start_writing; 
+        Lwt.cancel split_worker;
+        let%lwt _ = Lwt_io.close inchn in 
+        let%lwt _ = Lwt_io.close outchn in 
         Lwt.return () in 
       (* Ctrl + C can exit our loop *)
       let close_by_ourselves, close_ourselves = Lwt.wait () in  
       let handler = 
-        Lwt_unix.on_signal_full Sys.sigint (fun handler _ -> 
+        Lwt_unix.on_signal_full Sys.sigint (fun _ _ -> 
               let _ = MessageProtocal.send_disconnect outchn in 
-              Lwt_unix.disable_signal_handler handler;
               Lwt.wakeup_later close_ourselves ()
             ) in 
       let close_by_receiver = 
@@ -168,7 +167,8 @@ let server_addr =
   (Unix.ADDR_INET(Unix.inet_addr_of_string _LOCAL_HOST, port))
 
 
-(* This following version is somehow not satisfactory *)
+(* This following version is somehow not satisfactory
+    I can test a bug out... I don't really know the behaviour so... *)
 (* let rec start_server () =  
   let rec keep_waiting () =
     let%lwt _ =  Lwt.pause () in 
@@ -191,9 +191,11 @@ let start_server () =
   info_print "Listening ...";
     let%lwt sock = listening_socket in 
     let%lwt msg_socket, _ = Lwt_unix.accept sock in 
-    let inch = Lwt_io.of_fd ~close:(fun _ -> info_print "Socket/Input Channel Closing"; return ()) ~mode:Lwt_io.Input msg_socket in 
-    let outch = Lwt_io.of_fd ~close:(fun _ -> info_print "Socket/Output Channel Closing"; return ()) ~mode:Lwt_io.Output msg_socket in 
+    let inch = Lwt_io.of_fd ~close:(fun _ -> return ()) ~mode:Lwt_io.Input msg_socket in 
+    let outch = Lwt_io.of_fd ~close:(fun _ -> return ()) ~mode:Lwt_io.Output msg_socket in 
     let%lwt _ = chatting (inch,outch) in 
+    (* Close File Descripter cause problem ... Why? *)
+    (* let%lwt _ = Lwt_unix.close msg_socket in  *)
     serve() in 
   serve()
 
