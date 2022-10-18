@@ -5,11 +5,16 @@ exception NonImplement
 
 type arbitrary_channel = Package : ('a channel) ->  arbitrary_channel
 
+let debug_print (s : string) = print_endline s
+
 (* Guarding to make sure chns are all open *)
 let with_channel (chns : arbitrary_channel list) (f : unit -> 'b Lwt.t) (c : unit -> 'c Lwt.t) (default : 'b) : 'b Lwt.t = 
   let any_is_closed = List.fold_left (fun a (Package b) -> a || (Lwt_io.is_closed b)) false chns in 
   if any_is_closed then 
-    (let%lwt _ = c () in Lwt.return ()) 
+    begin 
+    (* debug_print "Some Channel is already closed!"; *)
+    (let%lwt _ = c () in Lwt.return default) 
+    end
   else f ()
 
 let with_channel_unit chn f ?(when_end=(fun _ -> Lwt.return ())) () = with_channel chn f when_end ()
@@ -55,7 +60,9 @@ module MessageProtocal = struct
       with_channel [Package inchn] 
       begin 
         fun _ -> 
+          (* debug_print "Classifier Working Now!"; *)
           let%lwt newinfo = Lwt_io.read_line inchn in 
+          (* debug_print "New Line Coming, we classify!"; *)
           let%lwt _ = begin match data_classification newinfo with 
                       | Msg ->  let pureinfo = remove_header newinfo in 
                                 Lwt_io.write_line msg_outchn pureinfo 
@@ -71,8 +78,8 @@ module MessageProtocal = struct
     in 
     (msg_inchn, receipt_inchn, classifier())
 
-  let send_receipt (outchn : output_channel) : unit Lwt.t = Lwt_io.write_line outchn receipt_header
-  let send_message s (outchn : output_channel) : unit Lwt.t = Lwt_io.write_line outchn (msg_header^s)
+  let send_receipt (outchn : output_channel) : unit Lwt.t = Lwt_io.write_line outchn (receipt_header)
+  let send_message (outchn : output_channel) s : unit Lwt.t = Lwt_io.write_line outchn (msg_header^s)
     
 end
 
@@ -84,6 +91,7 @@ end
 (* Currently this is fixed with stdout and stdin as interactive interface *)
 let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t = 
   (* first split the channel into msg and recepit *)
+  debug_print "New Link Connected!";
   let msg_inchn, receipt_inchn, split_worker = MessageProtocal.classify_input inchn in 
   
   let rec reader_to_screen () = 
@@ -99,11 +107,13 @@ let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t =
   let rec writer_to_socket () = 
   with_channel_unit [Package receipt_inchn; Package outchn; Package stdin]
   begin fun _ ->
-    let before_sent = Sys.time() in 
     let%lwt data = Lwt_io.(read_line stdin) in
-    let%lwt () = Lwt_io.write outchn data in 
+    let before_sent = Sys.time() in 
+    (* debug_print "Writing New Things"; *)
+    let%lwt () = MessageProtocal.send_message outchn data in 
     let%lwt _ = Lwt_io.read_line receipt_inchn in 
-    Printf.printf "Message (%s) Delivered, roundtrip time: %fs\n" data (Sys.time() -. before_sent);
+    let roundtrip = Printf.sprintf "Message (%s) Delivered, roundtrip time: %fs" data (Sys.time() -. before_sent) in 
+    debug_print roundtrip;
     writer_to_socket () 
   end ()
   in 
@@ -113,6 +123,7 @@ let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t =
   let%lwt _ = start_reading in 
   let%lwt _ = start_writing in 
   let%lwt _ = split_worker in 
+  debug_print "Link Disconnected!";
   Lwt.return ()
 
 
@@ -121,32 +132,40 @@ let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t =
 let server_addr = 
   (* let socket = Lwt_unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in  *)
   let _LOCAL_HOST = "127.0.0.1" in  
-  let port = 9998 in 
+  let port = 3000 in 
   (Unix.ADDR_INET(Unix.inet_addr_of_string _LOCAL_HOST, port))
 
+let rec keep_waiting () =
+  let%lwt _ =  Lwt.pause () in 
+  keep_waiting ()
 
 let rec start_server () =  
-    let%lwt _ = Lwt_io.establish_server_with_client_address server_addr (fun _ p -> chatting p) in 
-    start_server ()
-    (* Wait for the next connection*)
+  debug_print "Starting Server ...";
+  let%lwt _ = Lwt_io.establish_server_with_client_address server_addr (fun _ p -> chatting p) in 
+  keep_waiting ()
 
 let start_client () =
+  debug_print "Trying to Connect ...";
     Lwt_io.with_connection server_addr chatting
 
 
 let () =
-  if Array.length Sys.argv != 1
-     || (Array.get Sys.argv 0 != "Server" && Array.get Sys.argv 0 != "Client")
+  if Array.length Sys.argv != 2
+     || not (Sys.argv.(1) = "Server" || Sys.argv.(1) = "Client")
     then 
     begin
-      Printf.printf "Usage: One argument either Server or Client";
+      Printf.printf "Usage: One argument either Server or Client\n";
+      for i = 0 to Array.length Sys.argv - 1 do
+        Printf.printf "[%i] %s\n" i Sys.argv.(i)
+      done;
       exit (-1)
     end
     else (); 
   Lwt_main.run @@
-  if Array.get Sys.argv 0 == "Server" 
+  if Sys.argv.(1) = "Server" 
     then 
-    start_server () 
+    let%lwt _ = start_server () in 
+    Lwt.return_unit
     else
     start_client ()
 
