@@ -3,3 +3,6 @@ chat: chat.ml
 
 clean:
 	rm -f ./chat
+	rm -f *.cmi
+	rm -f *.cmx
+	rm -f *.o
