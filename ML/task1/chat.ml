@@ -289,6 +289,7 @@ let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t =
         Lwt.return () in 
       (* Ctrl + C can exit our loop *)
       let close_by_ourselves, close_ourselves = Lwt.wait () in 
+      (* The following will cause problem, I don't know why *)
       (* let close_by_ourselves =  
         Lwt.bind close_by_ourselves exit_chatting_threads in   *)
       let handler = 
