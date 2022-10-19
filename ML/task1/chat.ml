@@ -29,8 +29,11 @@ let with_channel_unit chn f ?(when_end=(fun _ -> info_print "Channel Closed!"; L
    *)
 module type MessageProtocolInterface = sig 
 
+  (* Enforced Abstraction, to enforce more invariant 
+     i.e. send_receipt can only use recipt channel *)
   type content
 
+  
   type about_message
 
   type about_receipt 
@@ -40,6 +43,7 @@ module type MessageProtocolInterface = sig
   (* Classify the input channel into three channels
       where we also has an async thread doing the separation *)
   val classify_input : input_channel -> (about_message channel * about_receipt channel * about_disconnect channel * unit Lwt.t)
+
 
   val send_receipt : output_channel -> unit Lwt.t
   val send_message : output_channel -> content -> unit Lwt.t 
@@ -143,14 +147,17 @@ end
 
 module MessageProtocolArbitrary (X : content_ty) : (MessageProtocolInterface with type content = X.content) 
   = struct
-
+    (* The arbitrary type the developer may want *)
   type content = X.content
 
   type msgty = Msg of content | Receipt | Disconnect
 
 
-  (* a parameter *)
+  (* a parameter, alter as you like *)
   let _LENGTH_ = 6
+
+
+  (* Generic, Raw sending, using Marshall *)
 
   (* encode into <int> * <Marshal's String> *)
   let send_stuff_ (outchn : output_channel) (stuff : 'a) : unit Lwt.t = 
@@ -242,6 +249,7 @@ module MessageProtocolBetter = MessageProtocolArbitrary(Dataty)
 
 let k (f : Dataty.content) = print_endline f 
 
+(* The core functionality, do the chatting *)
 (* Given input and output channel, do the chatting work *)
 (* Currently this is fixed with stdout and stdin as interactive interface *)
 let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t = 
@@ -305,6 +313,7 @@ let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t =
         info_print "Receiver Disconnected. Closing Right now...";
         exit_chatting_threads () 
       in 
+      (* we stop when either side is saying they are done *)
       let%lwt _ = Lwt.pick [close_by_receiver; close_by_ourselves] in 
       Lwt_unix.disable_signal_handler handler;
       info_print "Link Disconnected!";
@@ -314,7 +323,7 @@ let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t =
 
 
 
-(* Configuration *)
+(* Configuration, Hardwired. *)
 let server_addr = 
   (* let socket = Lwt_unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in  *)
   let _LOCAL_HOST = "127.0.0.1" in  
@@ -322,7 +331,7 @@ let server_addr =
   (Unix.ADDR_INET(Unix.inet_addr_of_string _LOCAL_HOST, port))
 
 
-(* This following version is somehow not satisfactory
+(* This following version of start_server is somehow not satisfactory
     I can test a bug out... I don't really know the behaviour ... *)
 (* let rec start_server () =  
   let rec keep_waiting () =
