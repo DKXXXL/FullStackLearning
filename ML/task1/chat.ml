@@ -4,6 +4,7 @@ open Lwt
 
 exception NonImplement
 
+(* Currently used as a poorman's info dumper *)
 let info_print (s : string) = print_endline s
 
 (* Existential type, because we might want a list of outchannel and inchannel *)
@@ -61,8 +62,9 @@ end
 
 
 (* This version is using \n as separator of the data
-   so not really all encoding acceptable (sendstuff, readstuff are non implemented things)
-   we need to implement another module  *)
+   so not really all encoding acceptable 
+   Please Check the MessageProtocolArbitrary below for the version that supports arbitrary type
+   *)
 module MessageProtocolNaive : (MessageProtocolInterface with type content = string) = struct
 
   type content = string
@@ -247,8 +249,6 @@ end
 
 module MessageProtocolBetter = MessageProtocolArbitrary(Dataty)
 
-let k (f : Dataty.content) = print_endline f 
-
 (* The core functionality, do the chatting *)
 (* Given input and output channel, do the chatting work *)
 (* Currently this is fixed with stdout and stdin as interactive interface *)
@@ -286,7 +286,7 @@ let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t =
 
 
   begin 
-      (* The workers *)
+      (* The two workers *)
       let start_reading = reader_to_screen () in 
       let start_writing = writer_to_socket () in 
       let exit_chatting_threads () = 
@@ -368,7 +368,7 @@ let start_client () =
   info_print "Trying to Connect ...";
     Lwt_io.with_connection server_addr chatting
 
-
+(* Arguments *)
 let () =
   if Array.length Sys.argv != 2
      || not (Sys.argv.(1) = "Server" || Sys.argv.(1) = "Client")
