@@ -289,8 +289,8 @@ let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t =
         Lwt.return () in 
       (* Ctrl + C can exit our loop *)
       let close_by_ourselves, close_ourselves = Lwt.wait () in 
-      let close_by_ourselves =  
-        Lwt.bind close_by_ourselves exit_chatting_threads in  
+      (* let close_by_ourselves =  
+        Lwt.bind close_by_ourselves exit_chatting_threads in   *)
       let handler = 
         Lwt_unix.on_signal_full Sys.sigint (fun _ _ -> 
               let _ = send_disconnect outchn in 
