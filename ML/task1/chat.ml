@@ -229,14 +229,26 @@ end
 
 
 
+(* Setting The data type we want to send about
+    here we can have all sorts of type defined
+    
+    but to test things, we only have string type to test
+*)
+module Dataty = struct 
+  type content = string
+end 
 
+module MessageProtocolBetter = MessageProtocolArbitrary(Dataty)
+
+let k (f : Dataty.content) = print_endline f 
 
 (* Given input and output channel, do the chatting work *)
 (* Currently this is fixed with stdout and stdin as interactive interface *)
 let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t = 
   (* first split the channel into msg and recepit *)
   info_print "New Link Connected!";
-  let open MessageProtocolNaive in 
+  (* let open MessageProtocolNaive in  *)
+  let open MessageProtocolBetter in 
   let msg_inchn, receipt_inchn, disconnect_inchn, split_worker = classify_input inchn in 
   
   let rec reader_to_screen () = 
