@@ -348,7 +348,7 @@ let start_server () =
     let open Lwt_unix in
     let sock = socket PF_INET SOCK_STREAM 0 in
     let%lwt _ =  bind sock @@ server_addr in 
-    listen sock 1;
+    listen sock 0;
     Lwt.return sock
   in 
   let rec serve () = 
