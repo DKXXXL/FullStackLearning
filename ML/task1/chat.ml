@@ -29,6 +29,8 @@ let with_channel_unit chn f ?(when_end=(fun _ -> info_print "Channel Closed!"; L
    *)
 module type MessageProtocolInterface = sig 
 
+  type content
+
   type about_message
 
   type about_receipt 
@@ -40,17 +42,26 @@ module type MessageProtocolInterface = sig
   val classify_input : input_channel -> (about_message channel * about_receipt channel * about_disconnect channel * unit Lwt.t)
 
   val send_receipt : output_channel -> unit Lwt.t
-  val send_message : output_channel -> string -> unit Lwt.t 
+  val send_message : output_channel -> content -> unit Lwt.t 
   val send_disconnect : output_channel -> unit Lwt.t
 
-  val read_message : about_message channel ->  string Lwt.t 
+  (* val send_stuff : output_channel -> 'a -> unit Lwt.t *)
+
+  val read_message : about_message channel ->  content Lwt.t 
   val read_receipt : about_receipt channel -> unit Lwt.t 
   val read_disconnect : about_disconnect channel -> unit Lwt.t
+
+  (* val read_stuff : about_message channel -> 'a Lwt.t *)
+
 end
 
 
-module MessageProtocolNaive : MessageProtocolInterface = struct
+(* This version is using \n as separator of the data
+   so not really all encoding acceptable (sendstuff, readstuff are non implemented things)
+   we need to implement another module  *)
+module MessageProtocolNaive : (MessageProtocolInterface with type content = string) = struct
 
+  type content = string
   (* Old untyped way -- we make sure every
       untyped messages, when sent, has a header indicating the "type" of the message
       currently the allowed header is either receipt or msg
@@ -73,10 +84,6 @@ module MessageProtocolNaive : MessageProtocolInterface = struct
     | Disconnect
     | Receipt -> 
       String.sub s 1 (String.length s - 1)
-  (* Make sure the header is lawful -- i.e. either receipt or msg 
-      But We maynot need this function   
-  *)
-  let validate_header (_ : input_channel) : unit Lwt.t = raise NonImplement 
 
   (* we classify the channel into two parts, 
      one for recepit receiver
@@ -121,12 +128,103 @@ module MessageProtocolNaive : MessageProtocolInterface = struct
   let send_message (outchn : output_channel) s : unit Lwt.t = Lwt_io.write_line outchn (msg_header^s)
   let send_disconnect outchn = Lwt_io.write_line outchn on_close_header
 
+
   let read_message (inchn : input_channel) : string Lwt.t = Lwt_io.read_line inchn 
 
   let read_receipt (inchn : input_channel) : unit Lwt.t = Lwt_io.read_line inchn >>= (fun _ -> return_unit) 
 
   let read_disconnect (inchn : input_channel)  : unit Lwt.t = Lwt_io.read_line inchn >>= (fun _ -> return_unit)
-    
+
+end
+
+module type content_ty = sig 
+  type content
+end 
+
+module MessageProtocolArbitrary (X : content_ty) : (MessageProtocolInterface with type content = X.content) 
+  = struct
+
+  type content = X.content
+
+  type msgty = Msg of content | Receipt | Disconnect
+
+
+  (* a parameter *)
+  let _LENGTH_ = 6
+
+  (* encode into <int> * <Marshal's String> *)
+  let send_stuff_ (outchn : output_channel) (stuff : 'a) : unit Lwt.t = 
+    let rawdata = Marshal.to_string (stuff) [] in 
+    let l = String.length rawdata in 
+    let encoded_l = string_of_int l in 
+    let fix_length (l : string) =
+      if String.length l < _LENGTH_ then String.sub (l^"AAAAAA") 0 _LENGTH_ else 
+        (if String.length l > _LENGTH_ then raise (Failure "Too Large file") else l)  
+      in 
+    let encoded_l_with_fixed_length = fix_length encoded_l in 
+    let all_info = encoded_l_with_fixed_length^rawdata in 
+    Lwt_io.write outchn all_info
+
+  (* inverse of send_stuff_  *)
+  let read_stuff_ (inchn : input_channel) : 'a Lwt.t = 
+    let unfix_string (l:string) = 
+      let index = String.index l 'A' in 
+      let l = String.sub l 0 index in 
+      int_of_string l
+    in 
+    let%lwt the_length = 
+      let%lwt encoded_length = Lwt_io.read ~count:_LENGTH_ inchn in 
+      Lwt.return @@ unfix_string encoded_length in 
+    let%lwt marshalled = Lwt_io.read ~count:the_length inchn in 
+    Lwt.return @@ Marshal.from_string marshalled 0
+
+
+  let classify_input (inchn : input_channel) : (input_channel * input_channel * input_channel * unit Lwt.t) = 
+    let msg_inchn, msg_outchn = pipe () in 
+    let receipt_inchn, receipt_outchn = pipe () in 
+    let disconnect_inchn, disconnect_outchn = pipe() in 
+    let rec classifier () = 
+      with_channel [Package inchn] 
+      begin 
+        fun _ -> 
+          (* info_print "Classifier Working Now!"; *)
+          let%lwt (newinfo : msgty) = read_stuff_ inchn in 
+          (* info_print "New Line Coming, we classify!"; *)
+          let%lwt _ = begin match newinfo with 
+                      | Msg ct ->  send_stuff_ msg_outchn ct 
+                      | Receipt -> Lwt_io.write_line receipt_outchn "1" 
+                      (* there is no content in receipt, 
+                         we control here so we can use write line *)
+                      | Disconnect -> Lwt_io.write_line disconnect_outchn "1" 
+                      end in 
+            classifier ()
+      end  
+      (fun _ -> 
+        info_print "Closing Classifier";
+        let%lwt _ = Lwt_io.close msg_outchn in 
+        let%lwt _ = Lwt_io.close receipt_outchn in 
+        Lwt.return () 
+        ) () (* Close the splitted Channel when inchn is closed *)
+    in 
+    (msg_inchn, receipt_inchn, disconnect_inchn, classifier())
+
+    type about_message = input 
+
+    type about_receipt = input 
+    (* Disconnect Channel is a channel for signalling disconnection *)
+    type about_disconnect = input
+  
+    let send_receipt (outchn : output_channel) : unit Lwt.t = send_stuff_ outchn Receipt
+    let send_message (outchn : output_channel) s : unit Lwt.t = send_stuff_ outchn (Msg s)
+    let send_disconnect outchn : unit Lwt.t = send_stuff_ outchn Disconnect
+  
+  
+    let read_message (inchn : input_channel) : content Lwt.t = read_stuff_ inchn 
+  
+    let read_receipt (inchn : input_channel) : unit Lwt.t = Lwt_io.read_line inchn >>= (fun _ -> return_unit) 
+  
+    let read_disconnect (inchn : input_channel)  : unit Lwt.t = Lwt_io.read_line inchn >>= (fun _ -> return_unit)
+  
 end
 
 
