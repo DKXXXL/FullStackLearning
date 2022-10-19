@@ -324,10 +324,10 @@ let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t =
 
 
 (* Configuration, Hardwired. *)
-let server_addr = 
+let server_addr _LOCAL_HOST port = 
   (* let socket = Lwt_unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in  *)
-  let _LOCAL_HOST = "127.0.0.1" in  
-  let port = 3000 in 
+  (* let _LOCAL_HOST = "127.0.0.1" in  
+  let port = 3000 in  *)
   (Unix.ADDR_INET(Unix.inet_addr_of_string _LOCAL_HOST, port))
 
 
@@ -341,7 +341,7 @@ let server_addr =
   let%lwt _ = Lwt_io.establish_server_with_client_address server_addr (fun _ p -> chatting p) in 
   keep_waiting () *)
 
-let start_server () = 
+let start_server (server_addr : Unix.sockaddr) = 
   info_print "Starting Server ...";
   let open Lwt in
   let listening_socket = 
@@ -364,29 +364,38 @@ let start_server () =
   serve()
 
 
-let start_client () =
+let start_client (server_addr : Unix.sockaddr) =
   info_print "Trying to Connect ...";
     Lwt_io.with_connection server_addr chatting
 
 (* Arguments *)
 let () =
-  if Array.length Sys.argv != 2
+  if Array.length Sys.argv != 3
      || not (Sys.argv.(1) = "Server" || Sys.argv.(1) = "Client")
     then 
     begin
-      Printf.printf "Usage: One argument either Server or Client\n";
+      Printf.printf "Usage: First argument either Server or Client, Second Argument IP:Port\n";
       for i = 0 to Array.length Sys.argv - 1 do
         Printf.printf "[%i] %s\n" i Sys.argv.(i)
       done;
       exit (-1)
     end
     else (); 
+  let ip,port = 
+    let ipport = Sys.argv.(2) in 
+    let index = String.index ipport ':' in 
+    let ip = String.sub ipport 0 index in 
+    let port = String.sub ipport (index+1) (String.length ipport - (index + 1)) in 
+    let port = int_of_string port in 
+    (ip, port) 
+  in 
+  let svr_addr = server_addr ip port in 
   Lwt_main.run @@
   if Sys.argv.(1) = "Server" 
     then 
-    let%lwt _ = start_server () in 
+    let%lwt _ = start_server svr_addr in 
     Lwt.return_unit
     else
-    start_client ()
+    start_client svr_addr
 
   
