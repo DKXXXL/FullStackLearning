@@ -278,6 +278,7 @@ let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t =
 
 
   begin 
+      (* The workers *)
       let start_reading = reader_to_screen () in 
       let start_writing = writer_to_socket () in 
       let exit_chatting_threads () = 
@@ -287,11 +288,13 @@ let chatting ((inchn, outchn) : (input_channel * output_channel)) : unit Lwt.t =
         let%lwt _ = Lwt_io.close inchn in 
         let%lwt _ = Lwt_io.close outchn in 
         Lwt.return () in 
-      (* Ctrl + C can exit our loop *)
+
       let close_by_ourselves, close_ourselves = Lwt.wait () in 
       (* The following will cause problem, I don't know why *)
       (* let close_by_ourselves =  
         Lwt.bind close_by_ourselves exit_chatting_threads in   *)
+
+      (* Ctrl + C can exit our loop *)
       let handler = 
         Lwt_unix.on_signal_full Sys.sigint (fun _ _ -> 
               let _ = send_disconnect outchn in 
@@ -320,7 +323,7 @@ let server_addr =
 
 
 (* This following version is somehow not satisfactory
-    I can test a bug out... I don't really know the behaviour so... *)
+    I can test a bug out... I don't really know the behaviour ... *)
 (* let rec start_server () =  
   let rec keep_waiting () =
     let%lwt _ =  Lwt.pause () in 
