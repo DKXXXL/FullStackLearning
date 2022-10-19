@@ -1,6 +1,6 @@
 # The Chatter
 * Make sure `lwt`, (and `lwt_ppx`, `lwt.unix`) package is installed
-* Use `make` to build, you can also check the oneline `ocamlopt` command
+* Use `make` to build, you can also check the oneline `ocamlopt` command that makes it
 * `./chat Client` will invoke the Client side
 * `./chat Server` will invoke the server side
 * to quit a chatting session, press `Ctrl + C` (or send interactive interrupt signal corresponds to `Sys.sigint`)
